@@ -10,13 +10,6 @@ import UIKit
 
 class MemeEditorViewController: UIViewController {
     
-    let memeTextAttributes: [NSAttributedString.Key: Any] = [
-        NSAttributedString.Key.strokeColor: UIColor.black,
-        NSAttributedString.Key.foregroundColor: UIColor.white,
-        NSAttributedString.Key.font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
-        NSAttributedString.Key.strokeWidth: -5  // negative to stroke and fill
-    ]
-    
     @objc
     lazy var imageView: UIImageView = {
         let iv = UIImageView()
@@ -24,22 +17,29 @@ class MemeEditorViewController: UIViewController {
         return iv
     }()
     
+    static func applyTextFieldStyleProperties(textField: UITextField) {
+        textField.textAlignment = .center
+        textField.autocapitalizationType = .allCharacters
+        textField.defaultTextAttributes = [
+            NSAttributedString.Key.strokeColor: UIColor.black,
+            NSAttributedString.Key.foregroundColor: UIColor.white,
+            NSAttributedString.Key.font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
+            NSAttributedString.Key.strokeWidth: -5  // negative to stroke and fill
+        ]
+    }
+    
     lazy var topTextField: UITextField = {
         let textField = UITextField(frame: .zero)
-        textField.autocapitalizationType = .allCharacters
+        MemeEditorViewController.applyTextFieldStyleProperties(textField: textField)
         textField.text = "TOP"
-        textField.defaultTextAttributes = self.memeTextAttributes
-        textField.textAlignment = .center
         textField.delegate = self
         return textField
     }()
     
     lazy var bottomTextField: UITextField = {
         let textField = UITextField(frame: .zero)
-        textField.autocapitalizationType = .allCharacters
+        MemeEditorViewController.applyTextFieldStyleProperties(textField: textField)
         textField.text = "BOTTOM"
-        textField.defaultTextAttributes = self.memeTextAttributes
-        textField.textAlignment = .center
         textField.delegate = self
         return textField
     }()
@@ -132,7 +132,9 @@ class MemeEditorViewController: UIViewController {
         let memedImage = generateMemedImage()
         let activityVC = UIActivityViewController(activityItems: [memedImage], applicationActivities: nil)
         activityVC.completionWithItemsHandler = { [unowned self] activityType, completed, returnedItems, activityError in
-            self.save()
+            if completed {
+                self.save()
+            }
         }
         present(activityVC, animated: true, completion: nil)
     }
@@ -159,7 +161,7 @@ class MemeEditorViewController: UIViewController {
     
     @objc
     func keyboardWillShow(_ notification: Notification) {
-        // move view up if bottom textfield is selected
+        // move view up if keyboard appears while bottom textfield is selected
         if bottomTextField.isFirstResponder {
             if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
                 view.frame.origin.y -= frame.height
@@ -169,11 +171,9 @@ class MemeEditorViewController: UIViewController {
     
     @objc
     func keyboardWillHide(_ notification: Notification) {
-        // move view down if bottom textfield was selected
+        // reset view when keyboard is dismissed while bottom textfield is selected
         if bottomTextField.isFirstResponder {
-            if let frame = notification.userInfo?[UIResponder.keyboardFrameBeginUserInfoKey] as? CGRect {
-                view.frame.origin.y += frame.height
-            }
+            view.frame.origin.y = 0
         }
     }
 }
