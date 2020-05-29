@@ -20,12 +20,17 @@ class MemeEditorViewController: UIViewController {
     static func applyTextFieldStyleProperties(textField: UITextField) {
         textField.textAlignment = .center
         textField.autocapitalizationType = .allCharacters
+        textField.adjustsFontSizeToFitWidth = true
         textField.defaultTextAttributes = [
             NSAttributedString.Key.strokeColor: UIColor.black,
             NSAttributedString.Key.foregroundColor: UIColor.white,
             NSAttributedString.Key.font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
             NSAttributedString.Key.strokeWidth: -5  // negative to stroke and fill
         ]
+        // Add a small padding to the left side of the text field
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 15, height: textField.frame.height))
+        textField.leftView = paddingView
+        textField.leftViewMode = .always
     }
     
     lazy var topTextField: UITextField = {
@@ -89,6 +94,7 @@ class MemeEditorViewController: UIViewController {
 
         let stackView = UIStackView(arrangedSubviews: [topTextField, UIView(), bottomTextField])
         stackView.axis = .vertical
+        stackView.alignment = .center
         stackView.distribution = .fillEqually
         
         view.addSubview(stackView)
