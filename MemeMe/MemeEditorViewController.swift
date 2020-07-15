@@ -8,8 +8,31 @@
 
 import UIKit
 
+// MARK: - UITextField extension
+
+private extension UITextField {
+    static var meme: UITextField {
+        let textField = UITextField(frame: .zero)
+        textField.textAlignment = .center
+        textField.autocapitalizationType = .allCharacters
+        textField.adjustsFontSizeToFitWidth = true
+        textField.defaultTextAttributes = [
+            .strokeColor: UIColor.black,
+            .foregroundColor: UIColor.white,
+            .font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
+            .strokeWidth: -5  // negative to stroke and fill
+        ]
+        // Add a small padding to the left side of the text field
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 15, height: textField.frame.height))
+        textField.leftView = paddingView
+        textField.leftViewMode = .always
+        return textField
+    }
+}
+
+// MARK: - MemeEditorViewController declaration
+
 class MemeEditorViewController: UIViewController {
-    
     @objc
     lazy var imageView: UIImageView = {
         let iv = UIImageView()
@@ -17,33 +40,15 @@ class MemeEditorViewController: UIViewController {
         return iv
     }()
     
-    static func applyTextFieldStyleProperties(textField: UITextField) {
-        textField.textAlignment = .center
-        textField.autocapitalizationType = .allCharacters
-        textField.adjustsFontSizeToFitWidth = true
-        textField.defaultTextAttributes = [
-            NSAttributedString.Key.strokeColor: UIColor.black,
-            NSAttributedString.Key.foregroundColor: UIColor.white,
-            NSAttributedString.Key.font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
-            NSAttributedString.Key.strokeWidth: -5  // negative to stroke and fill
-        ]
-        // Add a small padding to the left side of the text field
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 15, height: textField.frame.height))
-        textField.leftView = paddingView
-        textField.leftViewMode = .always
-    }
-    
     lazy var topTextField: UITextField = {
-        let textField = UITextField(frame: .zero)
-        MemeEditorViewController.applyTextFieldStyleProperties(textField: textField)
+        let textField = UITextField.meme
         textField.text = "TOP"
         textField.delegate = self
         return textField
     }()
     
     lazy var bottomTextField: UITextField = {
-        let textField = UITextField(frame: .zero)
-        MemeEditorViewController.applyTextFieldStyleProperties(textField: textField)
+        let textField = UITextField.meme
         textField.text = "BOTTOM"
         textField.delegate = self
         return textField
@@ -65,7 +70,7 @@ class MemeEditorViewController: UIViewController {
     
     var observation: NSKeyValueObservation?
     
-    // MARK: - UIViewController lifecycle
+    // MARK: UIViewController lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -121,7 +126,7 @@ class MemeEditorViewController: UIViewController {
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
     }
     
-    // MARK:- Image picker
+    // MARK: Image picker
     
     @objc
     func presentImagePicker(sender: UIBarButtonItem) {
@@ -131,7 +136,7 @@ class MemeEditorViewController: UIViewController {
         present(imagePicker, animated: true, completion: nil)
     }
     
-    // MARK:- Share
+    // MARK: Share
     
     @objc
     func presentShareSheet() {
@@ -163,7 +168,7 @@ class MemeEditorViewController: UIViewController {
         print("saved meme: \(meme)")
     }
     
-    // MARK:- Keyboard hide/show behavior
+    // MARK: Keyboard hide/show behavior
     
     @objc
     func keyboardWillShow(_ notification: Notification) {
@@ -178,13 +183,12 @@ class MemeEditorViewController: UIViewController {
     @objc
     func keyboardWillHide(_ notification: Notification) {
         // reset view when keyboard is dismissed while bottom textfield is selected
-        if bottomTextField.isFirstResponder {
-            view.frame.origin.y = 0
-        }
+        // no need to check that bottomTextField.isFirstResponder here
+        view.frame.origin.y = 0
     }
 }
 
-// MARK:- UIImagePickerDelegate methods
+// MARK: - UIImagePickerDelegate methods
 
 extension MemeEditorViewController: UIImagePickerControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
@@ -195,13 +199,13 @@ extension MemeEditorViewController: UIImagePickerControllerDelegate {
     }
 }
 
-// MARK:- UINavigationControllerDelegate methods
+// MARK: - UINavigationControllerDelegate methods
 
 extension MemeEditorViewController: UINavigationControllerDelegate {
     
 }
 
-// MARK:- UITextfieldDelegate methods
+// MARK: - UITextfieldDelegate methods
 
 extension MemeEditorViewController: UITextFieldDelegate {
     func textFieldDidBeginEditing(_ textField: UITextField) {
