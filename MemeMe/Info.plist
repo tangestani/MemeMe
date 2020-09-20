@@ -62,5 +62,9 @@
 	<string>Do you want to save created memes to your photo library?</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Do you want to create memes using pictures taken with your camera?</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Impact.ttf</string>
+	</array>
 </dict>
 </plist>

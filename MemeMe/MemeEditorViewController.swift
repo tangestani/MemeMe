@@ -13,19 +13,18 @@ import UIKit
 private extension UITextField {
     static var meme: UITextField {
         let textField = UITextField(frame: .zero)
-        textField.textAlignment = .center
-        textField.autocapitalizationType = .allCharacters
-        textField.adjustsFontSizeToFitWidth = true
+        let font = UIFont(name: "Impact", size: 40)!
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
         textField.defaultTextAttributes = [
             .strokeColor: UIColor.black,
             .foregroundColor: UIColor.white,
-            .font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
-            .strokeWidth: -5  // negative to stroke and fill
+            .font: font,
+            .strokeWidth: -5,  // negative to stroke and fill
+            .paragraphStyle: paragraphStyle,
         ]
-        // Add a small padding to the left side of the text field
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 15, height: textField.frame.height))
-        textField.leftView = paddingView
-        textField.leftViewMode = .always
+        textField.autocapitalizationType = .allCharacters
+        textField.adjustsFontSizeToFitWidth = true
         return textField
     }
 }
@@ -33,26 +32,68 @@ private extension UITextField {
 // MARK: - MemeEditorViewController declaration
 
 class MemeEditorViewController: UIViewController {
+    let meme: Meme
+    
+    var imageObserver: NSKeyValueObservation?
+    
+    convenience init() {
+        let defaultMeme = Meme(topText: "TOP", bottomText: "BOTTOM", originalImage: nil, memedImage: nil)
+        self.init(meme: defaultMeme)
+    }
+    
+    init(meme: Meme) {
+        self.meme = meme
+        super.init(nibName: nil, bundle: nil)
+        
+        imageObserver = observe(\.imageView.image) { [unowned self] object, _ in
+            if object.imageView.image == nil {
+                self.navigationItem.leftBarButtonItem?.isEnabled = false
+            } else {
+                self.navigationItem.leftBarButtonItem?.isEnabled = true
+            }
+        }
+    }
+    
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    // MARK: Lazy Properties
+    
     @objc
     lazy var imageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFit
+        iv.image = meme.originalImage
+//        iv.backgroundColor = .white
         return iv
     }()
     
     lazy var topTextField: UITextField = {
         let textField = UITextField.meme
-        textField.text = "TOP"
+        textField.text = meme.topText.uppercased()
         textField.delegate = self
         return textField
     }()
     
     lazy var bottomTextField: UITextField = {
         let textField = UITextField.meme
-        textField.text = "BOTTOM"
+        textField.text = meme.bottomText.uppercased()
         textField.delegate = self
         return textField
     }()
+    
+    lazy var memeView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [topTextField, UIView(), UIView(), bottomTextField])
+        stackView.axis = .vertical
+        stackView.distribution = .fillEqually
+        stackView.layer.borderWidth = 1
+        stackView.layer.borderColor = UIColor.white.cgColor
+        return stackView
+    }()
+    
+    // MARK: TabBarItems
     
     lazy var cameraButtonItem: UIBarButtonItem = {
         let buttonItem = UIBarButtonItem(barButtonSystemItem: .camera, target: self, action: #selector(presentImagePicker(sender:)))
@@ -68,9 +109,37 @@ class MemeEditorViewController: UIViewController {
         return buttonItem
     }()
     
-    var observation: NSKeyValueObservation?
+    var portraitConstraints = [NSLayoutConstraint]()
+    var landscapeConstraints = [NSLayoutConstraint]()
     
     // MARK: UIViewController lifecycle
+    
+    override func loadView() {
+        super.loadView()
+        
+        view.addSubview(imageView)
+        
+        imageView.frame = view.bounds
+//        imageView.autoresizingMask = [.fle, .flexibleHeight]
+        
+        view.addSubview(memeView)
+
+        memeView.translatesAutoresizingMaskIntoConstraints = false
+        portraitConstraints = [
+            memeView.widthAnchor.constraint(equalTo: memeView.heightAnchor),
+            memeView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            memeView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            memeView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ]
+        landscapeConstraints = [
+            memeView.widthAnchor.constraint(equalTo: memeView.heightAnchor),
+            memeView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            memeView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            memeView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+        ]
+
+        activateCurrentConstraints()
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -81,9 +150,10 @@ class MemeEditorViewController: UIViewController {
         self.navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .action, target: self, action: #selector(presentShareSheet))
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "Cancel", style: .plain, target: nil, action: nil)
+            title: "Cancel", style: .plain, target: self, action: #selector(dismissEditor))
         
         self.navigationItem.leftBarButtonItem?.isEnabled = false
+        imageView.image = imageView.image
         
         self.navigationController?.isToolbarHidden = false
         self.toolbarItems = [
@@ -92,28 +162,12 @@ class MemeEditorViewController: UIViewController {
             albumButtonItem,
         ]
         
-        view.addSubview(imageView)
-        
-        imageView.frame = view.frame
-        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-
-        let stackView = UIStackView(arrangedSubviews: [topTextField, UIView(), bottomTextField])
-        stackView.axis = .vertical
-        stackView.alignment = .center
-        stackView.distribution = .fillEqually
-        
-        view.addSubview(stackView)
-        
-        stackView.frame = view.frame
-        stackView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        
-        observation = imageView.observe(\.image) { [unowned self] iv, _ in
-            if iv.image == nil {
-                self.navigationItem.leftBarButtonItem?.isEnabled = false
-            } else {
-                self.navigationItem.leftBarButtonItem?.isEnabled = true
-            }
-        }
+        let panGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(panImage(_:)))
+        let pinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(zoomImage(_:)))
+        panGestureRecognizer.delegate = self
+        pinchGestureRecognizer.delegate = self
+        view.addGestureRecognizer(panGestureRecognizer)
+        view.addGestureRecognizer(pinchGestureRecognizer)
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -124,6 +178,57 @@ class MemeEditorViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    func activateCurrentConstraints() {
+        NSLayoutConstraint.deactivate(portraitConstraints + landscapeConstraints)
+        if traitCollection.verticalSizeClass == .regular {
+            // Portrait
+            NSLayoutConstraint.activate(portraitConstraints)
+        } else {
+            // Landscape
+            NSLayoutConstraint.activate(landscapeConstraints)
+        }
+    }
+    
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        
+        activateCurrentConstraints()
+        imageView.center = view.center
+    }
+    
+    @objc
+    func dismissEditor() {
+        dismiss(animated: true, completion: nil)
+    }
+    
+    // MARK: Image pan and zoom functions
+    
+    private var initialCenter = CGPoint()
+    @objc
+    func panImage(_ gestureRecognizer: UIPanGestureRecognizer) {
+        let translation = gestureRecognizer.translation(in: view)
+
+        if gestureRecognizer.state == .began {
+            initialCenter = imageView.center
+        }
+        if gestureRecognizer.state != .cancelled {
+            imageView.center = CGPoint(
+                x: initialCenter.x + translation.x,
+                y: initialCenter.y + translation.y)
+        } else {
+            imageView.center = initialCenter
+        }
+    }
+    
+    @objc
+    func zoomImage(_ gestureRecognizer: UIPinchGestureRecognizer) {
+        if gestureRecognizer.state == .began || gestureRecognizer.state == .changed {
+            let scale = gestureRecognizer.scale
+            imageView.transform = imageView.transform.scaledBy(x: scale, y: scale)
+            gestureRecognizer.scale = 1.0
+        }
     }
     
     // MARK: Image picker
@@ -150,32 +255,38 @@ class MemeEditorViewController: UIViewController {
         present(activityVC, animated: true, completion: nil)
     }
     
-    func generateMemedImage() -> UIImage {
+    func save() {
+        // update the meme
+        let meme = Meme(topText: topTextField.text!, bottomText: bottomTextField.text!, originalImage: imageView.image!, memedImage: generateMemedImage())
         
+        // add it to the memes array in the application delegate
+        (UIApplication.shared.delegate as! AppDelegate).memes.append(meme)
+        
+        print("saved meme: \(meme)")
+    }
+    
+    func generateMemedImage() -> UIImage {
         // Render view to an image
-        UIGraphicsBeginImageContext(self.view.frame.size)
-        view.drawHierarchy(in: self.view.frame, afterScreenUpdates: true)
+        UIGraphicsBeginImageContext(memeView.bounds.size)
+        let rect = memeView.bounds.insetBy(dx: -memeView.frame.minX, dy: -memeView.frame.minY)
+        view.drawHierarchy(in: rect, afterScreenUpdates: true)
         let memedImage: UIImage = UIGraphicsGetImageFromCurrentImageContext()!
         UIGraphicsEndImageContext()
 
         return memedImage
     }
     
-    func save() {
-        let memedImage = generateMemedImage()
-        // Create the meme
-        let meme = Meme(topText: topTextField.text!, bottomText: bottomTextField.text!, originalImage: imageView.image!, memedImage: memedImage)
-        print("saved meme: \(meme)")
-    }
-    
     // MARK: Keyboard hide/show behavior
     
     @objc
     func keyboardWillShow(_ notification: Notification) {
-        // move view up if keyboard appears while bottom textfield is selected
         if bottomTextField.isFirstResponder {
             if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                view.frame.origin.y -= frame.height
+                // This check is necessary, since this notification is sent at every keypress when using the keyboard
+                // on the simulator
+                if view.frame.origin.y == 0 {
+                    view.frame.origin.y -= frame.height
+                }
             }
         }
     }
@@ -188,12 +299,22 @@ class MemeEditorViewController: UIViewController {
     }
 }
 
+// MARK: - UIGestureRecognizerDelegate methods
+
+extension MemeEditorViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // This method allows the pinch and pan gestures to work simultaneously
+        true
+    }
+}
+
 // MARK: - UIImagePickerDelegate methods
 
 extension MemeEditorViewController: UIImagePickerControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         if let image = info[.originalImage] as? UIImage {
-            self.imageView.image = image
+            imageView.image = image
+            imageView.center = view.center
         }
         dismiss(animated: true)
     }
